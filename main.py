@@ -1,9 +1,12 @@
 import pandas as pd
 import os
 
+filename = "NQ_1_Minute_1month.txt"
+
 def import_nq_futures_data(file_path):
     """
-    Import 1-minute /NQ futures data from a text file.
+    Import 1-minute /NQ futures data from a text file with specific format:
+    Date,Time,Open,High,Low,Close,Volume,9SMA,21SMA,200SMA
     
     Args:
         file_path (str): Path to the text file containing the NQ futures data
@@ -16,45 +19,20 @@ def import_nq_futures_data(file_path):
         raise FileNotFoundError(f"The file {file_path} does not exist.")
     
     try:
-        # Attempt to read the file - common formats for futures data
-        # Assuming standard format: DateTime, Open, High, Low, Close, Volume
-        # First try a comma-separated format
-        df = pd.read_csv(file_path, parse_dates=True)
+        # Read CSV with expected format
+        df = pd.read_csv(file_path)
         
-        # If the file doesn't have headers, try with explicit column names
-        if len(df.columns) <= 2 or 'Open' not in df.columns:
-            df = pd.read_csv(file_path, 
-                             names=['DateTime', 'Open', 'High', 'Low', 'Close', 'Volume'],
-                             parse_dates=['DateTime'])
+        # Combine Date and Time columns to create DateTime
+        df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
         
-        # If the file is tab-delimited, try this format
-        if len(df.columns) == 1:
-            df = pd.read_csv(file_path, sep='\t', parse_dates=True)
-            
-            # And if needed, try with explicit column names
-            if len(df.columns) <= 2 or 'Open' not in df.columns:
-                df = pd.read_csv(file_path, 
-                                 sep='\t',
-                                 names=['DateTime', 'Open', 'High', 'Low', 'Close', 'Volume'],
-                                 parse_dates=['DateTime'])
+        # Drop original Date and Time columns
+        df.drop(['Date', 'Time'], axis=1, inplace=True)
         
-        # If we still don't have proper data, try a space-delimited format
-        if len(df.columns) <= 2 or 'Open' not in df.columns:
-            df = pd.read_csv(file_path, sep='\s+', parse_dates=True)
-            
-            # And with explicit column names if needed
-            if len(df.columns) <= 2 or 'Open' not in df.columns:
-                df = pd.read_csv(file_path,
-                                 sep='\s+',
-                                 names=['DateTime', 'Open', 'High', 'Low', 'Close', 'Volume'],
-                                 parse_dates=['DateTime'])
+        # Set the DateTime column as the index
+        df.set_index('DateTime', inplace=True)
         
-        # Set the DateTime column as the index if it exists
-        if 'DateTime' in df.columns:
-            df.set_index('DateTime', inplace=True)
-            
         # Convert numeric columns to appropriate data types
-        numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume', '9SMA', '21SMA', '200SMA']
         for col in numeric_columns:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -63,12 +41,14 @@ def import_nq_futures_data(file_path):
     
     except Exception as e:
         print(f"Error importing data: {e}")
-        print("If the format is non-standard, you may need to modify the script.")
+        print("Please ensure the file is in the expected format:")
+        print("Date,Time,Open,High,Low,Close,Volume,9SMA,21SMA,200SMA")
         return None
 
 def main():
-    # Example usage
-    file_path = input("Enter the path to your NQ futures data file: ")
+    # Hardcoded file path to be in the same folder as the script
+    file_path = os.path.join(os.path.dirname(__file__), filename)
+    
     df = import_nq_futures_data(file_path)
     
     if df is not None:
@@ -89,15 +69,6 @@ def main():
             'Volume': 'sum'
         })
         print(daily_stats.head())
-        
-        # Save to CSV option
-        save_option = input("\nDo you want to save the processed data to a CSV file? (y/n): ")
-        if save_option.lower() == 'y':
-            output_path = input("Enter the output file path (or press Enter for 'processed_nq_data.csv'): ")
-            if not output_path:
-                output_path = 'processed_nq_data.csv'
-            df.to_csv(output_path)
-            print(f"Data saved to {output_path}")
 
 if __name__ == "__main__":
     main()
